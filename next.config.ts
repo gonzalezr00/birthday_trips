@@ -1,7 +1,12 @@
-import type { NextConfig } from "next";
+// next.config.ts
+const supabaseHost = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!).hostname;
 
-const nextConfig: NextConfig = {
-  /* config options here */
+const nextConfig = {
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: supabaseHost },
+    ],
+  },
 };
 
 export default nextConfig;
