@@ -1,60 +1,80 @@
+// src/app/trips/page.tsx
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
-
-type Trip = {
-  id: string;
+type TripRow = {
+  slug: string;
   title: string;
-  startDate: string; // ISO
-  endDate?: string;  // ISO
   location: string;
-  cover?: string;    // (will be a Supabase image later)
-  status: "past" | "upcoming";
+  start_date: string | null;
+  end_date: string | null;
+  visibility: "public" | "private";
 };
 
-const demoTrips: Trip[] = [
-  { id: "lux-2025-09", title: "Luxembourg — Sep 2025", startDate: "2025-09-20", endDate: "2025-09-27", location: "Luxembourg", status: "upcoming" },
-  { id: "porto-2024-06", title: "Porto — Jun 2024", startDate: "2024-06-10", endDate: "2024-06-15", location: "Portugal", status: "past" },
-];
-
 export const metadata = { title: "Trips • Birthday Trips" };
+export const revalidate = 60; // cache SSR result for 60s
 
-export default function TripsPage() {
-  const past = demoTrips.filter(t => t.status === "past");
-  const upcoming = demoTrips.filter(t => t.status === "upcoming");
+export default async function TripsPage() {
+  const { data, error } = await supabase
+    .from("trips")
+    .select("slug,title,location,start_date,end_date,visibility")
+    .eq("visibility", "public")
+    .order("start_date", { ascending: false });
+
+  if (error) {
+    return (
+      <section className="space-y-4">
+        <h1 className="text-3xl font-bold">Trips</h1>
+        <p className="text-red-600">Error loading trips: {error.message}</p>
+      </section>
+    );
+  }
+
+  const trips = (data ?? []) as TripRow[];
+  const now = new Date();
+
+  const upcoming = trips.filter(
+    (t) => t.start_date && new Date(t.start_date) >= now
+  );
+  const past = trips.filter(
+    (t) => !t.start_date || new Date(t.start_date) < now
+  );
 
   return (
     <section className="space-y-10">
       <header className="flex items-end justify-between">
         <h1 className="text-3xl font-bold">Trips</h1>
-        <Link href="/planner" className="text-sm underline hover:no-underline">Open Planner →</Link>
+        <Link href="/planner" className="text-sm underline hover:no-underline">
+          Open Planner →
+        </Link>
       </header>
 
       {upcoming.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Upcoming</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {upcoming.map(t => <TripCard key={t.id} trip={t} />)}
-          </div>
-        </div>
+        <TripSection title="Upcoming" items={upcoming} />
       )}
 
-      {past.length > 0 && (
-        <div className="space-y-4">
-          <h2 className="text-xl font-semibold">Past</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {past.map(t => <TripCard key={t.id} trip={t} />)}
-          </div>
-        </div>
-      )}
+      {past.length > 0 && <TripSection title="Past" items={past} />}
     </section>
   );
 }
 
-function TripCard({ trip }: { trip: Trip }) {
+function TripSection({ title, items }: { title: string; items: TripRow[] }) {
+  return (
+    <div className="space-y-4">
+      <h2 className="text-xl font-semibold">{title}</h2>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {items.map((t) => (
+          <TripCard key={t.slug} trip={t} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TripCard({ trip }: { trip: TripRow }) {
   return (
     <Link
-      href={`/trips/${encodeURIComponent(trip.id)}`}
+      href={`/trips/${encodeURIComponent(trip.slug)}`}
       className="block rounded-xl border hover:bg-gray-50 transition"
     >
       <div className="aspect-[16/9] rounded-t-xl bg-gray-100" />
